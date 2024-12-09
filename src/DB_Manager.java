@@ -5,9 +5,15 @@ import java.sql.*;
  */
 public class DB_Manager
 {
-    static final String URL = "jdbc_mysql://localhost:3306/CornBOT";
+    static final String URL = "jdbc:mysql://localhost:3306/cornbot";
     static final String USER = "root";
     static final String PASSWORD = "";
+
+    Connection conn;
+
+    public DB_Manager() throws SQLException {
+        conn = DriverManager.getConnection(URL, USER, PASSWORD);
+    }
 
     /** Metodo statico per realizzare la connessione con il database
      *
@@ -22,13 +28,18 @@ public class DB_Manager
     /** Metodo statico per eseguire una query
      *
      * @param sql stringa della query da eseguire
+     * @param params parametri eventuali
      * @return ResultSet contenenti i risultati della query
      * @throws SQLException
      */
-    public static ResultSet query(String sql) throws SQLException
+    public ResultSet query(String sql, Object... params) throws SQLException
     {
-        Connection conn = getConnection();
+        //Connection conn = getConnection();
         PreparedStatement ps = conn.prepareStatement(sql);
+        for (int i = 0; i < params.length; i++)
+        {
+            ps.setObject(i + 1, params[i]);
+        }
         return ps.executeQuery();
     }
 
@@ -41,11 +52,11 @@ public class DB_Manager
     public static void update(String sql, Object... params) throws SQLException
     {
         Connection conn = getConnection();
-        PreparedStatement stmt = conn.prepareStatement(sql);
+        PreparedStatement ps = conn.prepareStatement(sql);
         for (int i = 0; i < params.length; i++)
         {
-            stmt.setObject(i + 1, params[i]);
+            ps.setObject(i + 1, params[i]);
         }
-        stmt.executeUpdate();
+        ps.executeUpdate();
     }
 }
