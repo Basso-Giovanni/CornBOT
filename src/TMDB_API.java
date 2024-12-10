@@ -2,16 +2,60 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
+
 import org.json.*;
 
 public class TMDB_API
 {
     static final String API_KEY = "8316b32b99cf749bffb0f7ba0cff4191"; //DA TOGLIERE DA QUI
 
-    public static JSONObject GET(int id)
+    public static ArrayList<String> GET_piattaforme(int id)
     {
+        ArrayList<String> providers = new ArrayList<>();
         String apiUrl = "https://api.themoviedb.org/3/movie/" + id + "/watch/providers?api_key=" + API_KEY;
+        JSONObject film = GET(apiUrl);
 
+        if (film.has("IT"))
+        {
+            JSONObject provider_italia = film.getJSONObject("IT");
+
+            if (provider_italia.has("flatrate"))
+            {
+                JSONArray piattaforme = provider_italia.getJSONArray("flatrate");
+                for (int i = 0; i < piattaforme.length(); i++)
+                {
+                    JSONObject piattaforma = piattaforme.getJSONObject(i);
+                    providers.add(piattaforma.getString("provider_name"));
+                }
+            }
+        }
+        return providers;
+    }
+
+    public static String GET_trailer(int id)
+    {
+        JSONObject film = GET("https://api.themoviedb.org/3/movie/" + id + "/videos?api_key=" + API_KEY);
+        String URL_trailer = null;
+
+        for (int i = 0; i < film.length(); i++)
+        {
+            JSONObject video = film.getJSONObject(i);
+            if (video.getString("type").equalsIgnoreCase("Trailer") &&
+                    video.getString("site").equalsIgnoreCase("YouTube") &&
+                    video.getBoolean("official")) {
+
+                // Costruisci il link del trailer
+                String videoKey = video.getString("key");
+                URL_trailer = "https://www.youtube.com/watch?v=" + videoKey;
+                break;
+            }
+        }
+
+    }
+
+    private static JSONObject GET(String apiUrl)
+    {
         try
         {
             // Effettua la richiesta HTTP

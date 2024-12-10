@@ -5,10 +5,11 @@ import org.jsoup.select.Elements;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 
 public class TMDB_Scraper
 {
-    public static void Film_scraper(String URL)
+    public static void Film_scraper(String URL, int id)
     {
         try
         {
@@ -43,15 +44,18 @@ public class TMDB_Scraper
 
             int totalMinutes = (hours * 60) + minutes;
 
-            Elements platforms = doc.select(".ott_provider a img");
-            StringBuilder platformsList = new StringBuilder();
-            for (Element platform : platforms)
-                platformsList.append(platform.attr("alt")).append(", ");
+            ArrayList<String> piattaforme = TMDB_API.GET_piattaforme(id);
+            StringBuilder sb = new StringBuilder();
+
+            for (String p : piattaforme)
+            {
+                sb.append(p + " ");
+            }
 
             String regista = doc.select("li.profile.director a").text();
 
             String sql = "INSERT INTO Film (titolo, anno_produzione, genere, trama, durata, data_uscita, piattaforme) VALUES (?, ?, ?, ?, ?, ?, ?)";
-            DB_Manager.update(sql, titolo, anno, genere, trama, totalMinutes, formattedDate, platformsList.toString());
+            DB_Manager.update(sql, titolo, anno, genere, trama, totalMinutes, formattedDate, sb.toString());
         }
         catch (Exception e)
         {
