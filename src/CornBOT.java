@@ -60,19 +60,19 @@ public class CornBOT extends TelegramLongPollingBot
 
     private void cercaFilm(Long chatId, String titolo)
     {
-        String sql = "SELECT * FROM Film INNER JOIN soggetto ON Soggetto.id_soggetto = Film.regista WHERE titolo LIKE ?";
+        String sql = "SELECT * FROM Film LEFT JOIN soggetto ON Soggetto.id_soggetto = Film.regista WHERE titolo LIKE ?";
         try
         {
-            DB_Manager db = new DB_Manager();
-            ResultSet rs = db.query(sql, "%" + titolo + "%");
+            ResultSet rs = DB_Manager.query(sql, "%" + titolo + "%");
             if (rs.next())
             {
                 String reply = "Titolo 🎞️: " + rs.getString("titolo") +
-                        "\nAnno 📅:" + rs.getInt("anno_produzione") +
-                        "Genere 👺: " + rs.getString("genere") +
-                        "Durata 🕑: " + rs.getInt("durata") +
-                        "Regista 📹: " + rs.getInt("regista") +
-                        "Piattaforme 📺: " + rs.getString("piattaforme");
+                        "\nAnno 📅: " + rs.getInt("anno_produzione") +
+                        "\nGenere 👺: " + rs.getString("genere") +
+                        "\nDurata 🕑: " + rs.getInt("durata") +
+                        "\nRegista 📹: " + rs.getInt("regista") +
+                        "\nPiattaforme 📺: " + rs.getString("piattaforme") +
+                        "\nTrailer 📺: " + rs.getString("trailer_url");
                 sendMessage(chatId, reply);
             }
             else

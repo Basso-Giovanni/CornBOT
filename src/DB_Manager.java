@@ -9,12 +9,6 @@ public class DB_Manager
     static final String USER = "root";
     static final String PASSWORD = "";
 
-    Connection conn;
-
-    public DB_Manager() throws SQLException {
-        conn = DriverManager.getConnection(URL, USER, PASSWORD);
-    }
-
     /** Metodo statico per realizzare la connessione con il database
      *
      * @return Connection
@@ -32,9 +26,9 @@ public class DB_Manager
      * @return ResultSet contenenti i risultati della query
      * @throws SQLException
      */
-    public ResultSet query(String sql, Object... params) throws SQLException
+    public static ResultSet query(String sql, Object... params) throws SQLException
     {
-        //Connection conn = getConnection();
+        Connection conn = getConnection();
         PreparedStatement ps = conn.prepareStatement(sql);
         for (int i = 0; i < params.length; i++)
         {
