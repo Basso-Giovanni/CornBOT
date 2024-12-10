@@ -10,5 +10,6 @@
     <orderEntry type="library" name="mysql.connector.j" level="project" />
     <orderEntry type="library" name="telegram.telegrambots.abilities" level="project" />
     <orderEntry type="library" name="jsoup" level="project" />
+    <orderEntry type="library" name="json" level="project" />
   </component>
 </module>
