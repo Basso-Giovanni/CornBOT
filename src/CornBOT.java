@@ -12,7 +12,7 @@ import java.sql.SQLException;
 public class CornBOT extends TelegramLongPollingBot
 {
     final String botUsername = "corntelegrambot";
-    final String token = "7941615256:AAE2WeGyld7cX-R4OBqoqGHl5hVWUInlHXM"; //DA TOGLIERE DA QUI
+    final String token = Config.getBotToken();
 
     /** Getter per username bot
      *

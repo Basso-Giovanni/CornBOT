@@ -8,7 +8,7 @@ import org.json.*;
 
 public class TMDB_API
 {
-    static final String API_KEY = "8316b32b99cf749bffb0f7ba0cff4191"; //DA TOGLIERE DA QUI
+    static final String API_KEY = Config.getTMDBToken();
 
     public static ArrayList<String> GET_piattaforme(int id)
     {
@@ -40,7 +40,7 @@ public class TMDB_API
 
         for (int i = 0; i < film.length(); i++)
         {
-            JSONObject video = film.getJSONObject(i);
+            JSONObject video = film.getJSONObject("i"); //esempio inutile giusto per togliere l'errore in compilazione
             if (video.getString("type").equalsIgnoreCase("Trailer") &&
                     video.getString("site").equalsIgnoreCase("YouTube") &&
                     video.getBoolean("official")) {
@@ -51,7 +51,7 @@ public class TMDB_API
                 break;
             }
         }
-
+        return URL_trailer;
     }
 
     private static JSONObject GET(String apiUrl)
