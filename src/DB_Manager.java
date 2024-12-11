@@ -31,10 +31,35 @@ public class DB_Manager
         Connection conn = getConnection();
         PreparedStatement ps = conn.prepareStatement(sql);
         for (int i = 0; i < params.length; i++)
-        {
             ps.setObject(i + 1, params[i]);
-        }
         return ps.executeQuery();
+    }
+
+    /** Metodo statico per eseguire una query da cui ci si aspetta un risultato unico e intero
+     *
+     * @param sql query da eseguire
+     * @param params eventuali parametri
+     * @return intero
+     * @throws SQLException
+     */
+    public static Integer query_ID(String sql, Object... params) throws SQLException
+    {
+        Integer result = null;
+        Connection conn = getConnection();
+        PreparedStatement ps = conn.prepareStatement(sql);
+        for (int i = 0; i < params.length; i++)
+            ps.setObject(i + 1, params[i]);
+        try (ResultSet rs = ps.executeQuery())
+        {
+            if (rs.next())
+                result = rs.getInt(1);
+        }
+        catch (SQLException e)
+        {
+            System.out.println("⚠️ Errore durante l'esecuzione della query");
+        }
+
+        return result;
     }
 
     /** Metodo statico per eseguire un UPDATE al database

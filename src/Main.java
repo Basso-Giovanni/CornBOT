@@ -5,6 +5,7 @@ public class Main
 {
     public static void main(String[] args)
     {
+        TMDB_Scraper.Film_scraper("https://www.themoviedb.org/movie/680-pulp-fiction", 680);
 //        try
 //        {
 //            TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
@@ -15,9 +16,5 @@ public class Main
 //        {
 //            e.printStackTrace();
 //        }
-
-        TMDB_API.GET_trailer(550);
-
-        //TMDB_Scraper.Film_scraper("https://www.themoviedb.org/movie/680-pulp-fiction", 680);
     }
 }

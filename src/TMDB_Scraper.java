@@ -6,6 +6,7 @@ import org.jsoup.select.Elements;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 public class TMDB_Scraper
 {
@@ -52,15 +53,81 @@ public class TMDB_Scraper
                 sb.append(p + " ");
             }
 
-            String regista = doc.select("li.profile.director a").text();
+            String url_trailer = TMDB_API.GET_trailer(id); //ottengo le informazioni del trailer tramite API
 
-            String sql = "INSERT INTO Film (titolo, anno_produzione, genere, trama, durata, data_uscita, piattaforme) VALUES (?, ?, ?, ?, ?, ?, ?)";
-            DB_Manager.update(sql, titolo, anno, genere, trama, totalMinutes, formattedDate, sb.toString());
+            String regista = "";
+            Elements people = doc.select("ol.people.no_image li.profile");
+
+            // Cerca il regista tra i profili
+            for (Element person : people)
+            {
+                String role = person.select("p.character").text();
+                if (role.contains("Director"))
+                {
+                    // Ottieni il nome del regista
+                    regista = person.select("p > a").text();
+                    break;
+                }
+            }
+            String sql_regista = "SELECT id_soggetto FROM Soggetto WHERE nome = ? AND cognome = ?";
+            Integer registaId = DB_Manager.query_ID(sql_regista, regista.split(" ")[0], regista.split(" ")[1]);
+
+            if (registaId == null) registaId = Soggetto_scraper(id, true, 0);
+
+            String sql = "INSERT INTO Film (titolo, anno_produzione, genere, trama, durata, data_uscita, piattaforme, trailer_url, regista) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            DB_Manager.update(sql, titolo, anno, genere, trama, totalMinutes, formattedDate, sb.toString(), url_trailer, registaId);
+
+
+
+            String query_id_film = "SELECT id_film FROM Film WHERE titolo = ?";
+            Integer id_film = DB_Manager.query_ID(query_id_film, titolo);
+
+            HashMap<Integer, String> ids = TMDB_API.GET_attoreIDDaFilm(id);
+
+            for (Integer id_attore : ids.keySet())
+            {
+                ArrayList<String> info_attore = TMDB_API.GET_soggetto(id_attore);
+                if (info_attore != null)
+                {
+                    String sql_attore = "SELECT id_soggetto FROM Soggetto WHERE nome = ? AND cognome = ?";
+                    Integer attoreId = DB_Manager.query_ID(sql_attore, info_attore.get(0), info_attore.get(1));
+
+                    if (attoreId == null) attoreId = Soggetto_scraper(id, false, id_attore);
+
+                    String sql_attoreFilm = "INSERT INTO Partecipare (film, soggetto, ruolo) VALUES (?, ?, ?)";
+                    DB_Manager.update(sql_attoreFilm, id_film, attoreId, ids.get(id_attore));
+                }
+            }
         }
         catch (Exception e)
         {
             System.out.println("⚠️ Errore nell'estrazione dei dati. URL: " + URL);
         }
 
+    }
+
+    public static Integer Soggetto_scraper(int id_film, boolean regia, int id_attore)
+    {
+        try
+        {
+            ArrayList<String> info;
+            if (regia)
+                info = TMDB_API.GET_soggetto(TMDB_API.GET_registaIDDaFilm(id_film));
+            else
+                info = TMDB_API.GET_soggetto(id_attore);
+
+            // Inserire il soggetto nella tabella Soggetto
+            String insertQuery = "INSERT INTO Soggetto (nome, cognome, data_nascita, luogo_nascita, data_morte, biografia, sesso) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            DB_Manager.update(insertQuery, info.get(0), info.get(1), info.get(2), info.get(4), info.get(3), info.get(5), info.get(6));
+
+            // Recupera l'ID del soggetto appena inserito
+            String getIdQuery = "SELECT id_soggetto FROM Soggetto WHERE nome = ? AND cognome = ?";
+            return DB_Manager.query_ID(getIdQuery, info.get(0), info.get(1));
+        }
+        catch (Exception e)
+        {
+            System.out.println("⚠️ Errore nello scraping del soggetto");
+            return null;
+        }
     }
 }
