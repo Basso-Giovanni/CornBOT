@@ -126,7 +126,7 @@ public class TMDB_Scraper
         }
         catch (Exception e)
         {
-            System.out.println("⚠️ Errore nello scraping del soggetto");
+            System.out.println("⚠️ Errore nello scraping del soggetto: " + id_attore + " del film " + id_film);
             return null;
         }
     }
