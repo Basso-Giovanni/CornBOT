@@ -69,8 +69,8 @@ public class TMDB_Scraper
                     break;
                 }
             }
-            String sql_regista = "SELECT id_soggetto FROM Soggetto WHERE nome = ? AND cognome = ?";
-            Integer registaId = DB_Manager.query_ID(sql_regista, regista.split(" ")[0], regista.split(" ")[1]);
+            String sql_regista = "SELECT id_soggetto FROM Soggetto WHERE nome = ?";
+            Integer registaId = DB_Manager.query_ID(sql_regista, regista);
 
             if (registaId == null) registaId = Soggetto_scraper(id, true, 0);
 
@@ -89,8 +89,8 @@ public class TMDB_Scraper
                 ArrayList<String> info_attore = TMDB_API.GET_soggetto(id_attore);
                 if (info_attore != null)
                 {
-                    String sql_attore = "SELECT id_soggetto FROM Soggetto WHERE nome = ? AND cognome = ?";
-                    Integer attoreId = DB_Manager.query_ID(sql_attore, info_attore.get(0), info_attore.get(1));
+                    String sql_attore = "SELECT id_soggetto FROM Soggetto WHERE nome = ?";
+                    Integer attoreId = DB_Manager.query_ID(sql_attore, info_attore.get(0));
 
                     if (attoreId == null) attoreId = Soggetto_scraper(id, false, id_attore);
 
@@ -117,12 +117,12 @@ public class TMDB_Scraper
                 info = TMDB_API.GET_soggetto(id_attore);
 
             // Inserire il soggetto nella tabella Soggetto
-            String insertQuery = "INSERT INTO Soggetto (nome, cognome, data_nascita, luogo_nascita, data_morte, biografia, sesso) VALUES (?, ?, ?, ?, ?, ?, ?)";
-            DB_Manager.update(insertQuery, info.get(0), info.get(1), info.get(2), info.get(4), info.get(3), info.get(5), info.get(6));
+            String insertQuery = "INSERT INTO Soggetto (nome, data_nascita, luogo_nascita, data_morte, biografia, sesso) VALUES (?, ?, ?, ?, ?, ?)";
+            DB_Manager.update(insertQuery, info.get(0), info.get(1), info.get(3), info.get(2), info.get(4), info.get(5));
 
             // Recupera l'ID del soggetto appena inserito
-            String getIdQuery = "SELECT id_soggetto FROM Soggetto WHERE nome = ? AND cognome = ?";
-            return DB_Manager.query_ID(getIdQuery, info.get(0), info.get(1));
+            String getIdQuery = "SELECT id_soggetto FROM Soggetto WHERE nome = ?";
+            return DB_Manager.query_ID(getIdQuery, info.get(0));
         }
         catch (Exception e)
         {

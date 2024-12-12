@@ -130,8 +130,7 @@ public class TMDB_API
         ArrayList<String> info = new ArrayList<>();
         if (!dati.isNull("name") && !dati.isNull("birthday") && !dati.isNull("place_of_birth") && !dati.isNull("gender"))
         {
-            info.add(dati.getString("name").split(" ")[0]); //nome
-            info.add(dati.getString("name").split(" ")[1]); //cognome
+            info.add(dati.getString("name"));
             info.add(dati.getString("birthday"));
             info.add(dati.isNull("deathday") ? null : dati.getString("deathday"));
             info.add(dati.getString("place_of_birth"));
