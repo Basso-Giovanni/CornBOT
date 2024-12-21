@@ -5,7 +5,7 @@ public class Main
 {
     public static void main(String[] args)
     {
-//        TMDB_Scraper.Film_scraper("https://www.themoviedb.org/movie/106646-the-wolf-of-wall-street", 106646);
+        //TMDB_Scraper.Film_scraper("https://www.themoviedb.org/movie/974576-conclave", 974576);
         try
         {
             TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
@@ -16,5 +16,9 @@ public class Main
         {
             e.printStackTrace();
         }
+
+        //Wiki_Scraper.Riconoscimenti_Scraper("lo squalo (film)");
+
+        //CS_Scraper.Cinema_scraping();
     }
 }

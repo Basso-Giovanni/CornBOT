@@ -54,7 +54,23 @@ public class CornBOT extends TelegramLongPollingBot
                 cercaFilm(chatId, titolo);
             }
             else if (messageText.equals("/start")) //comando per iniziare
+            {
                 sendMessage(chatId, "Benvenuto su CornBOT 🎞️! Usa /help per vedere i comandi.");
+                try
+                {
+                    String sql = "SELECT id_utente FROM utente WHERE telegram_id = ?";
+                    Integer id_utente = DB_Manager.query_ID(sql, chatId.intValue());
+                    if (id_utente == null)
+                    {
+                        sql = "INSERT INTO utente (telegram_id, nome, cognome, email, calendario_url) VALUES (?, ?, ?, ?, ?)";
+                        DB_Manager.update(sql, chatId.intValue(), null, null, null, null);
+                    }
+                }
+                catch (SQLException e)
+                {
+                    System.out.println("Errore nella creazione dell'utente");
+                }
+            }
             else if (messageText.startsWith("/cerca"))
             {
                 String persona = messageText.replace("/cerca", "").trim();

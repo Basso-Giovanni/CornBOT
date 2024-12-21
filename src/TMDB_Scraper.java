@@ -72,7 +72,7 @@ public class TMDB_Scraper
             String sql_regista = "SELECT id_soggetto FROM Soggetto WHERE nome = ?";
             Integer registaId = DB_Manager.query_ID(sql_regista, regista);
 
-            if (registaId == null) registaId = Soggetto_scraper(id, true, 0);
+            if (registaId == null) registaId = Soggetto_scraper(id, true, 0, regista);
 
             String sql = "INSERT INTO Film (titolo, anno_produzione, genere, trama, durata, data_uscita, piattaforme, trailer_url, regista) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
             DB_Manager.update(sql, titolo, anno, genere, trama, totalMinutes, formattedDate, sb.toString(), url_trailer, registaId);
@@ -92,7 +92,7 @@ public class TMDB_Scraper
                     String sql_attore = "SELECT id_soggetto FROM Soggetto WHERE nome = ?";
                     Integer attoreId = DB_Manager.query_ID(sql_attore, info_attore.get(0));
 
-                    if (attoreId == null) attoreId = Soggetto_scraper(id, false, id_attore);
+                    if (attoreId == null) attoreId = Soggetto_scraper(id, false, id_attore, null);
 
                     String sql_attoreFilm = "INSERT INTO Partecipare (film, soggetto, ruolo) VALUES (?, ?, ?)";
                     DB_Manager.update(sql_attoreFilm, id_film, attoreId, ids.get(id_attore));
@@ -106,13 +106,13 @@ public class TMDB_Scraper
 
     }
 
-    public static Integer Soggetto_scraper(int id_film, boolean regia, int id_attore)
+    public static Integer Soggetto_scraper(int id_film, boolean regia, int id_attore, String nome)
     {
         try
         {
             ArrayList<String> info;
             if (regia)
-                info = TMDB_API.GET_soggetto(TMDB_API.GET_registaIDDaFilm(id_film));
+                info = TMDB_API.GET_soggetto(TMDB_API.GET_registaIDDaFilm(id_film, nome));
             else
                 info = TMDB_API.GET_soggetto(id_attore);
 

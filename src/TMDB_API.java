@@ -99,7 +99,7 @@ public class TMDB_API
         return null;
     }
 
-    public static Integer GET_registaIDDaFilm(int id)
+    public static Integer GET_registaIDDaFilm(int id, String nome)
     {
         String apiUrl = "https://api.themoviedb.org/3/movie/" + id + "/credits?api_key=" + API_KEY;
         JSONArray casting = GET(apiUrl).getJSONArray("crew");
@@ -107,7 +107,7 @@ public class TMDB_API
         for (int i = 0; i < casting.length(); i++)
         {
             JSONObject cast = casting.getJSONObject(i);
-            if (cast.getString("job").equals("Director"))
+            if (cast.getString("job").equals("Director") && cast.getString("name").equals(nome))
                 return cast.getInt("id");
         }
         return null;
@@ -128,14 +128,14 @@ public class TMDB_API
     {
         JSONObject dati = GET("https://api.themoviedb.org/3/person/" + id + "?api_key=" + API_KEY);
         ArrayList<String> info = new ArrayList<>();
-        if (!dati.isNull("name") && !dati.isNull("birthday") && !dati.isNull("place_of_birth") && !dati.isNull("gender"))
+        if (!dati.isNull("name"))
         {
             info.add(dati.getString("name"));
-            info.add(dati.getString("birthday"));
+            info.add(dati.isNull("birthday") ? null : dati.getString("birthday"));
             info.add(dati.isNull("deathday") ? null : dati.getString("deathday"));
-            info.add(dati.getString("place_of_birth"));
+            info.add(dati.isNull("place_of_birth") ? null : dati.getString("place_of_birth"));
             info.add(dati.isNull("biography") ? null : dati.getString("biography"));
-            info.add(dati.getInt("gender") == 1 ? "femmina" : "maschio");
+            info.add(dati.isNull("gender") ? null : dati.getInt("gender") == 1 ? "femmina" : "maschio");
         }
         else return null;
 
