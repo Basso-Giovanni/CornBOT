@@ -53,6 +53,20 @@ public class CornBOT extends TelegramLongPollingBot
                 String titolo = messageText.replace("/cercafilm", "").trim();
                 cercaFilm(chatId, titolo);
             }
+            else if (messageText.startsWith("/watchlist")) //comando per vedere la watchlist
+            {
+                watchlist(chatId);
+            }
+            else if (messageText.startsWith("/visto")) //comando per togliere dalla watchlist
+            {
+                String titolo = messageText.replace("/visto", "").trim();
+                remWatchlist(chatId, titolo);
+            }
+            else if (messageText.startsWith("/aggiungiwatchlist")) //comando per aggiungere alla watchlist
+            {
+                String titolo = messageText.replace("/aggiungiwatchlist", "").trim();
+                addWatchlist(chatId, titolo);
+            }
             else if (messageText.equals("/start")) //comando per iniziare
             {
                 sendMessage(chatId, "Benvenuto su CornBOT 🎞️! Usa /help per vedere i comandi.");
@@ -61,10 +75,7 @@ public class CornBOT extends TelegramLongPollingBot
                     String sql = "SELECT id_utente FROM utente WHERE telegram_id = ?";
                     Integer id_utente = DB_Manager.query_ID(sql, chatId.intValue());
                     if (id_utente == null)
-                    {
-                        sql = "INSERT INTO utente (telegram_id, nome, cognome, email, calendario_url) VALUES (?, ?, ?, ?, ?)";
-                        DB_Manager.update(sql, chatId.intValue(), null, null, null, null);
-                    }
+                       addUser(chatId);
                 }
                 catch (SQLException e)
                 {
@@ -102,6 +113,11 @@ public class CornBOT extends TelegramLongPollingBot
                     System.out.println("⚠️ Errore nella richiesta della biografia di " + update.getCallbackQuery().getData().split("_")[1]);
                 }
             }
+            else if (update.getCallbackQuery().getData().contains("addwatchlist_"))
+            {
+                String titolo = update.getCallbackQuery().getData().split("_")[1];
+                addWatchlist(chatId, titolo);
+            }
         }
     }
 
@@ -120,7 +136,18 @@ public class CornBOT extends TelegramLongPollingBot
                         "\nRegista 📹: " + rs.getInt("regista") +
                         "\nPiattaforme 📺: " + rs.getString("piattaforme") +
                         "\nTrailer 📺: " + rs.getString("trailer_url");
-                sendMessage(chatId, reply);
+
+                InlineKeyboardMarkup ikm = new InlineKeyboardMarkup();
+
+                List<InlineKeyboardButton> lista_btn = new ArrayList<>();
+                InlineKeyboardButton btn = new InlineKeyboardButton();
+                btn.setText("Aggiungi alla watchlist 📺");
+                btn.setCallbackData("addwatchlist_" + rs.getString("titolo"));
+                lista_btn.add(btn);
+                List<List<InlineKeyboardButton>> riga = new ArrayList<>();
+                riga.add(lista_btn);
+                ikm.setKeyboard(riga);
+                sendMessage(chatId, reply, ikm);
             }
             else
             {
@@ -197,6 +224,95 @@ public class CornBOT extends TelegramLongPollingBot
         catch (TelegramApiException e)
         {
             System.out.println("⚠️ Errore nell'invio del messaggio!");
+        }
+    }
+
+    private void addWatchlist(Long chatId, String titolo_film)
+    {
+        try
+        {
+            String sql = "SELECT id_utente FROM utente WHERE telegram_id = ?";
+            Integer id_utente = DB_Manager.query_ID(sql, chatId.intValue());
+            sql = "SELECT id_film FROM film WHERE titolo = ?";
+            Integer id_film = DB_Manager.query_ID(sql, titolo_film);
+
+            if (id_utente != null)
+            {
+                if (id_film != null)
+                {
+                    try
+                    {
+                        sql = "INSERT INTO watchlist (utente, film) VALUES (?, ?)";
+                        DB_Manager.update(sql, id_utente, id_film);
+                        sendMessage(chatId, "Film aggiunto alla tua watchlist!");
+                    }
+                    catch (SQLException e)
+                    {
+                        sendMessage(chatId, "Il film " + titolo_film + " è già inserito nella tua watchlist!");
+                    }
+                }
+                else
+                    sendMessage(chatId, "Si è verificato un problema nell'inserimento del film " + titolo_film + " 😣");
+            }
+            else
+                addUser(chatId);
+        }
+        catch (SQLException e)
+        {
+            sendMessage(chatId, "Si è verificato un problema. Riprova più tardi 😣");
+        }
+    }
+
+    private void watchlist(Long chatId)
+    {
+        try
+        {
+            String sql = "SELECT id_utente FROM utente WHERE telegram_id = ?";
+            Integer id_utente = DB_Manager.query_ID(sql, chatId.intValue());
+            if (id_utente != null)
+            {
+                sql = "SELECT id_film, titolo FROM watchlist " +
+                        "INNER JOIN utente ON utente.id_utente = watchlist.utente " +
+                        "INNER JOIN film ON film.id_film = watchlist.film " +
+                        "WHERE id_utente = ?";
+
+                ResultSet rs = DB_Manager.query(sql, id_utente);
+                ArrayList<String[]> films = new ArrayList<>();
+                while (rs.next())
+                {
+                    Integer id_film = Integer.valueOf(rs.getInt("id_film"));
+                    String titolo_film = rs.getString("titolo");
+                    films.add(new String[]{id_film.toString(), titolo_film});
+                }
+                StringBuilder sb = new StringBuilder();
+                sb.append("WATCHLIST 📺\n");
+                for (int i = 0; i < films.size(); i++)
+                    sb.append(i + 1).append(". ").append(films.get(i)[1]);
+                sendMessage(chatId, sb.toString());
+            }
+            else
+            {
+                sendMessage(chatId, "Nessun film nella watchlist!");
+                addUser(chatId);
+            }
+
+        }
+        catch (SQLException e)
+        {
+            sendMessage(chatId, "Errore nell'apertura della watchlist!");
+        }
+    }
+
+    private void addUser(Long chatId)
+    {
+        try
+        {
+            String sql = "INSERT INTO utente (telegram_id, nome, cognome, email, calendario_url) VALUES (?, ?, ?, ?, ?)";
+            DB_Manager.update(sql, chatId.intValue(), null, null, null, null);
+        }
+        catch (SQLException e)
+        {
+            System.out.println("Errore nella creazione dell'utente: " + chatId);
         }
     }
 }
