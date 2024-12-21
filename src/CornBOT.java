@@ -53,9 +53,13 @@ public class CornBOT extends TelegramLongPollingBot
                 String titolo = messageText.replace("/cercafilm", "").trim();
                 cercaFilm(chatId, titolo);
             }
-            else if (messageText.startsWith("/watchlist")) //comando per vedere la watchlist
+            else if (messageText.equals("/watchlist")) //comando per vedere la watchlist
             {
                 watchlist(chatId);
+            }
+            else if (messageText.equals("/preferiti")) //comando per vedere la watchlist
+            {
+                preferitoFilm(chatId);
             }
             else if (messageText.startsWith("/visto")) //comando per togliere dalla watchlist
             {
@@ -118,12 +122,23 @@ public class CornBOT extends TelegramLongPollingBot
                 String titolo = update.getCallbackQuery().getData().split("_")[1];
                 addWatchlist(chatId, titolo);
             }
+            else if (update.getCallbackQuery().getData().contains("recensione_"))
+            {
+//                String titolo = update.getCallbackQuery().getData().split("_")[1];
+//                addWatchlist(chatId, titolo);
+                //da finire qua, farò domani, non ho voglia adesso
+            }
+            else if (update.getCallbackQuery().getData().contains("preferito_"))
+            {
+                Integer id_film = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
+                addPreferitoFilm(chatId, id_film);
+            }
         }
     }
 
     private void cercaFilm(Long chatId, String titolo)
     {
-        String sql = "SELECT * FROM Film LEFT JOIN soggetto ON Soggetto.id_soggetto = Film.regista WHERE titolo LIKE ?";
+        String sql = "SELECT *, nome FROM Film LEFT JOIN soggetto ON Soggetto.id_soggetto = Film.regista WHERE titolo LIKE ?";
         try
         {
             ResultSet rs = DB_Manager.query(sql, "%" + titolo + "%");
@@ -132,22 +147,35 @@ public class CornBOT extends TelegramLongPollingBot
                 String reply = "Titolo 🎞️: " + rs.getString("titolo") +
                         "\nAnno 📅: " + rs.getInt("anno_produzione") +
                         "\nGenere 👺: " + rs.getString("genere") +
-                        "\nDurata 🕑: " + rs.getInt("durata") +
-                        "\nRegista 📹: " + rs.getInt("regista") +
-                        "\nPiattaforme 📺: " + rs.getString("piattaforme") +
+                        "\nDurata 🕑: " + rs.getInt("durata") + " minuti" +
+                        "\nRegista 📹: " + rs.getString("nome") +
+                        "\nPiattaforme 📺: " + rs.getString("piattaforme") + //da sistemare nel caso in cui non ci siano piattaforme
                         "\nTrailer 📺: " + rs.getString("trailer_url");
 
                 InlineKeyboardMarkup ikm = new InlineKeyboardMarkup();
 
-                List<InlineKeyboardButton> lista_btn = new ArrayList<>();
-                InlineKeyboardButton btn = new InlineKeyboardButton();
-                btn.setText("Aggiungi alla watchlist 📺");
-                btn.setCallbackData("addwatchlist_" + rs.getString("titolo"));
-                lista_btn.add(btn);
+                List<InlineKeyboardButton> lista_btn_1 = new ArrayList<>();
+                List<InlineKeyboardButton> lista_btn_2 = new ArrayList<>();
+                List<InlineKeyboardButton> lista_btn_3 = new ArrayList<>();
+                InlineKeyboardButton btn_watch = new InlineKeyboardButton();
+                InlineKeyboardButton btn_rec = new InlineKeyboardButton();
+                InlineKeyboardButton btn_pre = new InlineKeyboardButton();
+                btn_watch.setText("Aggiungi alla watchlist 📺");
+                btn_rec.setText("Lascia una recensione ⭐");
+                btn_pre.setText("Aggiungi ai preferiti ✨");
+                btn_watch.setCallbackData("addwatchlist_" + rs.getString("titolo"));
+                btn_rec.setCallbackData("recensione_" + rs.getString("titolo"));
+                btn_pre.setCallbackData("preferito_" + rs.getInt("id_film"));
+                lista_btn_1.add(btn_watch);
+                lista_btn_2.add(btn_rec);
+                lista_btn_3.add(btn_pre);
                 List<List<InlineKeyboardButton>> riga = new ArrayList<>();
-                riga.add(lista_btn);
+                riga.add(lista_btn_1);
+                riga.add(lista_btn_2);
+                riga.add(lista_btn_3);
                 ikm.setKeyboard(riga);
                 sendMessage(chatId, reply, ikm);
+
             }
             else
             {
@@ -284,6 +312,10 @@ public class CornBOT extends TelegramLongPollingBot
                     String titolo_film = rs.getString("titolo");
                     films.add(new String[]{id_film.toString(), titolo_film});
                 }
+
+                if (films.isEmpty())
+                    sendMessage(chatId, "Non hai film nella tua watchlist. Prova a cercare dei titoli o usa il comando /aggiungiwatchlist titolo del film per aggiungerlo direttamente.");
+
                 StringBuilder sb = new StringBuilder();
                 sb.append("WATCHLIST 📺\n");
                 for (int i = 0; i < films.size(); i++)
@@ -300,6 +332,110 @@ public class CornBOT extends TelegramLongPollingBot
         catch (SQLException e)
         {
             sendMessage(chatId, "Errore nell'apertura della watchlist!");
+        }
+    }
+
+    private void remWatchlist(Long chatId, String titolo)
+    {
+        try
+        {
+            String sql = "SELECT id_utente FROM utente WHERE telegram_id = ?";
+            Integer id_utente = DB_Manager.query_ID(sql, chatId.intValue());
+
+            if (id_utente != null)
+            {
+                sql = "SELECT id_film, titolo FROM watchlist " +
+                        "INNER JOIN utente ON utente.id_utente = watchlist.utente " +
+                        "INNER JOIN film ON film.id_film = watchlist.film " +
+                        "WHERE id_utente = ? AND titolo LIKE ?";
+                ResultSet rs = DB_Manager.query(sql, id_utente, "%" + titolo + "%");
+
+                if (rs.next())
+                {
+                    sql = "DELETE FROM watchlist WHERE utente = ? AND film = ?";
+                    DB_Manager.update(sql, id_utente, rs.getInt("id_film"));
+                    sendMessage(chatId, "Rimosso il film " + rs.getString("titolo") + " dalla tua watchlist!");
+                }
+            }
+            else
+            {
+                sendMessage(chatId, "Film non trovato nella tua watchlist! Digita il comando /watchlist per vedere la tua watchlist");
+                addUser(chatId);
+            }
+
+        }
+        catch (SQLException e)
+        {
+            System.out.println("Errore nella rimozione del film");
+        }
+    }
+
+    private void addPreferitoFilm(Long chatId, Integer id_film)
+    {
+        try
+        {
+            String sql = "SELECT id_utente FROM utente WHERE telegram_id = ?";
+            Integer id_utente = DB_Manager.query_ID(sql, chatId.intValue());
+
+            if (id_utente != null)
+            {
+                sql = "INSERT INTO preferiti_film (utente, film) VALUES (?, ?)";
+                DB_Manager.update(sql, id_utente, id_film);
+                sendMessage(chatId, "Film aggiunto ai preferiti");
+            }
+            else
+            {
+                sendMessage(chatId, "Impossibile aggiungere il film ai preferiti 😣. Riprova in un secondo momento.");
+                addUser(chatId);
+            }
+        }
+        catch (SQLException e)
+        {
+            sendMessage(chatId, "⚠️ Errore nell'inserimento del film tra i preferiti.");
+        }
+    }
+
+    private void preferitoFilm(Long chatId)
+    {
+        try
+        {
+            String sql = "SELECT id_utente FROM utente WHERE telegram_id = ?";
+            Integer id_utente = DB_Manager.query_ID(sql, chatId.intValue());
+            if (id_utente != null)
+            {
+                sql = "SELECT id_film, titolo FROM preferiti_film " +
+                        "INNER JOIN utente ON utente.id_utente = preferiti_film.utente " +
+                        "INNER JOIN film ON film.id_film = preferiti_film.film " +
+                        "WHERE id_utente = ?";
+
+                ResultSet rs = DB_Manager.query(sql, id_utente);
+                ArrayList<String[]> films = new ArrayList<>();
+                while (rs.next())
+                {
+                    Integer id_film = Integer.valueOf(rs.getInt("id_film"));
+                    String titolo_film = rs.getString("titolo");
+                    films.add(new String[]{id_film.toString(), titolo_film});
+                }
+
+                if (films.isEmpty())
+                    sendMessage(chatId, "Non hai film preferiti. Prova a cercare dei titoli.");
+
+                StringBuilder sb = new StringBuilder();
+                sb.append("FILM PREFERITI ✨\n");
+                for (int i = 0; i < films.size(); i++)
+                    sb.append(i + 1).append(". ").append(films.get(i)[1]);
+                sendMessage(chatId, sb.toString());
+            }
+            else
+            {
+                sendMessage(chatId, "Nessun film preferito!");
+                addUser(chatId);
+            }
+
+        }
+        catch (SQLException e)
+        {
+            sendMessage(chatId, "Errore nella lettura dei film preferiti!");
         }
     }
 
