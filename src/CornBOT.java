@@ -226,6 +226,11 @@ public class CornBOT extends TelegramLongPollingBot
                 pendingCinema.put(chatId, id);
                 sendMessage(chatId, "Scrivi la città per cui fare la ricerca del cinema");
             }
+            else if (update.getCallbackQuery().getData().contains("cast_"))
+            {
+                int id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
+                casting(chatId, id);
+            }
         }
     }
 
@@ -273,6 +278,7 @@ public class CornBOT extends TelegramLongPollingBot
                 List<InlineKeyboardButton> lista_btn_5 = new ArrayList<>();
                 List<InlineKeyboardButton> lista_btn_6 = new ArrayList<>();
                 List<InlineKeyboardButton> lista_btn_7 = new ArrayList<>();
+                List<InlineKeyboardButton> lista_btn_8 = new ArrayList<>();
                 InlineKeyboardButton btn_watch = new InlineKeyboardButton();
                 InlineKeyboardButton btn_rec = new InlineKeyboardButton();
                 InlineKeyboardButton btn_pre = new InlineKeyboardButton();
@@ -281,6 +287,7 @@ public class CornBOT extends TelegramLongPollingBot
                 InlineKeyboardButton btn_vre = new InlineKeyboardButton();
                 InlineKeyboardButton btn_nre = new InlineKeyboardButton();
                 InlineKeyboardButton btn_cin = new InlineKeyboardButton();
+                InlineKeyboardButton btn_cas = new InlineKeyboardButton();
                 btn_watch.setText("Aggiungi alla watchlist 📺");
                 btn_rec.setText("Lascia una recensione ⭐");
                 btn_nre.setText("Elimina recensione ❌️");
@@ -289,6 +296,7 @@ public class CornBOT extends TelegramLongPollingBot
                 btn_vap.setText("Vedi appunti 📁️");
                 btn_vre.setText("Vedi recensioni  🧾️");
                 btn_cin.setText("️Trova il film nei cinema 📽️");
+                btn_cas.setText("Cast del film 🎞️️");
                 btn_watch.setCallbackData("addwatchlist_" + rs.getString("titolo"));
                 btn_rec.setCallbackData("recensione_" + rs.getInt("id_film"));
                 btn_pre.setCallbackData("preferitofilm_" + rs.getInt("id_film"));
@@ -297,6 +305,7 @@ public class CornBOT extends TelegramLongPollingBot
                 btn_vre.setCallbackData("vedirecensioni_" + rs.getInt("id_film"));
                 btn_nre.setCallbackData("norecensioni_" + rs.getInt("id_film"));
                 btn_cin.setCallbackData("cinema_" + rs.getInt("id_film"));
+                btn_cas.setCallbackData("cast_" + rs.getInt("id_film"));
                 lista_btn_1.add(btn_watch);
                 sql = "SELECT * FROM recensione INNER JOIN utente on utente.id_utente = recensione.utente WHERE film = ? AND telegram_id = ?";
                 rs_rec = DB_Manager.query(sql, rs.getInt("id_film"), chatId);
@@ -312,7 +321,9 @@ public class CornBOT extends TelegramLongPollingBot
                 if (rs_rec.next())
                     lista_btn_6.add(btn_vre);
                 lista_btn_7.add(btn_cin);
+                lista_btn_8.add(btn_cas);
                 List<List<InlineKeyboardButton>> riga = new ArrayList<>();
+                riga.add(lista_btn_8);
                 riga.add(lista_btn_1);
                 riga.add(lista_btn_2);
                 if (!preferito)
@@ -1002,6 +1013,25 @@ public class CornBOT extends TelegramLongPollingBot
         catch (SQLException e)
         {
             sendMessage(chatId, "Errore nella ricerca del cinema!");
+        }
+    }
+
+    private void casting(Long chatId, Integer id_film)
+    {
+        try
+        {
+            String sql = "SELECT * FROM partecipare INNER JOIN soggetto ON soggetto.id_soggetto = partecipare.soggetto WHERE film = ?";
+            ResultSet rs = DB_Manager.query(sql, id_film);
+            StringBuilder sb = new StringBuilder();
+            while (rs.next())
+            {
+                sb.append(" - ").append(rs.getString("soggetto.nome")).append(" come ").append(rs.getString("ruolo")).append("\n");
+            }
+            sendMessage(chatId, sb.toString());
+        }
+        catch (SQLException e)
+        {
+            sendMessage(chatId, "Errore nella lettura del casting del film");
         }
     }
 
