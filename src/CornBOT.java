@@ -67,14 +67,23 @@ public class CornBOT extends TelegramLongPollingBot
             {
                 watchlist(chatId);
             }
-            else if (messageText.equals("/preferitifilm")) //comando per vedere la watchlist
+            else if (messageText.equals("/preferitifilm")) //comando per vedere i film preferiti
             {
                 preferitoFilm(chatId);
             }
-            else if (messageText.startsWith("/nopreferitifilm")) //comando per rimuovere dai preferiti
+            else if (messageText.equals("/preferiti")) //comando per vedere i preferiti
+            {
+                preferitoSoggetto(chatId);
+            }
+            else if (messageText.startsWith("/nopreferitifilm")) //comando per rimuovere dai film preferiti
             {
                 String titolo = messageText.replace("/nopreferitifilm", "").trim();
                 remPreferitoFilm(chatId, titolo);
+            }
+            else if (messageText.startsWith("/nopreferiti")) //comando per rimuovere dai preferiti
+            {
+                String nome = messageText.replace("/nopreferiti", "").trim();
+                remPreferitoSoggetto(chatId, nome);
             }
             else if (messageText.startsWith("/visto")) //comando per togliere dalla watchlist
             {
@@ -143,10 +152,15 @@ public class CornBOT extends TelegramLongPollingBot
 //                addWatchlist(chatId, titolo);
                 //da finire qua, farò domani, non ho voglia adesso
             }
-            else if (update.getCallbackQuery().getData().contains("preferito_"))
+            else if (update.getCallbackQuery().getData().contains("preferitofilm_"))
             {
                 Integer id_film = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
-                addPreferitoFilm(chatId, id_film);
+                addPreferito(chatId, id_film, true);
+            }
+            else if (update.getCallbackQuery().getData().contains("preferitosoggetto_"))
+            {
+                Integer id_soggetto = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
+                addPreferito(chatId, id_soggetto, false);
             }
             else if (update.getCallbackQuery().getData().contains("appuntofilm_"))
             {
@@ -213,7 +227,7 @@ public class CornBOT extends TelegramLongPollingBot
                 btn_vap.setText("Vedi appunti 📁️");
                 btn_watch.setCallbackData("addwatchlist_" + rs.getString("titolo"));
                 btn_rec.setCallbackData("recensione_" + rs.getString("titolo"));
-                btn_pre.setCallbackData("preferito_" + rs.getInt("id_film"));
+                btn_pre.setCallbackData("preferitofilm_" + rs.getInt("id_film"));
                 btn_app.setCallbackData("appuntofilm_" + rs.getInt("id_film"));
                 btn_vap.setCallbackData("vediappuntifilm_" + rs.getInt("id_film"));
                 lista_btn_1.add(btn_watch);
@@ -259,6 +273,7 @@ public class CornBOT extends TelegramLongPollingBot
                 List<InlineKeyboardButton> lista_btn_1 = new ArrayList<>();
                 List<InlineKeyboardButton> lista_btn_2 = new ArrayList<>();
                 List<InlineKeyboardButton> lista_btn_3 = new ArrayList<>();
+                List<InlineKeyboardButton> lista_btn_4 = new ArrayList<>();
                 InlineKeyboardButton btn_bio = new InlineKeyboardButton();
                     btn_bio.setText("Biografia 📖");
                     btn_bio.setCallbackData("biografia_" + rs.getString("nome"));
@@ -271,10 +286,15 @@ public class CornBOT extends TelegramLongPollingBot
                     btn_vap.setText("Vedi appunti 📁");
                     btn_vap.setCallbackData("vediappuntisoggetto_" + rs.getInt("id_soggetto"));
                 lista_btn_3.add(btn_vap);
+                InlineKeyboardButton btn_pre = new InlineKeyboardButton();
+                    btn_pre.setText("Aggiungi ai preferiti ✨");
+                    btn_pre.setCallbackData("preferitosoggetto_" + rs.getInt("id_soggetto"));
+                lista_btn_4.add(btn_pre);
                 List<List<InlineKeyboardButton>> riga = new ArrayList<>();
                 riga.add(lista_btn_1);
                 riga.add(lista_btn_2);
                 riga.add(lista_btn_3);
+                riga.add(lista_btn_4);
                 ikm.setKeyboard(riga);
                 sendMessage(chatId, reply, ikm);
             }
@@ -433,7 +453,7 @@ public class CornBOT extends TelegramLongPollingBot
         }
     }
 
-    private void addPreferitoFilm(Long chatId, Integer id_film)
+    private void addPreferito(Long chatId, Integer id, Boolean film)
     {
         try
         {
@@ -442,19 +462,22 @@ public class CornBOT extends TelegramLongPollingBot
 
             if (id_utente != null)
             {
-                sql = "INSERT INTO preferiti_film (utente, film) VALUES (?, ?)";
-                DB_Manager.update(sql, id_utente, id_film);
-                sendMessage(chatId, "Film aggiunto ai preferiti");
+                if (film)
+                    sql = "INSERT INTO preferiti_film (utente, film) VALUES (?, ?)";
+                else
+                    sql = "INSERT INTO preferiti_soggetti (utente, soggetto) VALUES (?, ?)";
+                DB_Manager.update(sql, id_utente, id);
+                sendMessage(chatId, "Aggiunto ai preferiti correttamente!");
             }
             else
             {
-                sendMessage(chatId, "Impossibile aggiungere il film ai preferiti 😣. Riprova in un secondo momento.");
+                sendMessage(chatId, "Impossibile aggiungere ai preferiti 😣. Riprova in un secondo momento.");
                 addUser(chatId);
             }
         }
         catch (SQLException e)
         {
-            sendMessage(chatId, "⚠️ Errore nell'inserimento del film tra i preferiti.");
+            sendMessage(chatId, "⚠️ Errore nell'inserimento nei preferiti.");
         }
     }
 
@@ -481,7 +504,10 @@ public class CornBOT extends TelegramLongPollingBot
                 }
 
                 if (films.isEmpty())
+                {
                     sendMessage(chatId, "Non hai film preferiti. Prova a cercare dei titoli.");
+                    return;
+                }
 
                 StringBuilder sb = new StringBuilder();
                 sb.append("FILM PREFERITI ✨\n");
@@ -499,6 +525,51 @@ public class CornBOT extends TelegramLongPollingBot
         catch (SQLException e)
         {
             sendMessage(chatId, "Errore nella lettura dei film preferiti!");
+        }
+    }
+
+    private void preferitoSoggetto(Long chatId)
+    {
+        try
+        {
+            String sql = "SELECT id_utente FROM utente WHERE telegram_id = ?";
+            Integer id_utente = DB_Manager.query_ID(sql, chatId.intValue());
+            if (id_utente != null)
+            {
+                sql = "SELECT id_soggetto, soggetto.nome FROM preferiti_soggetti " +
+                        "INNER JOIN utente ON utente.id_utente = preferiti_soggetti.utente " +
+                        "INNER JOIN soggetto ON soggetto.id_soggetto = preferiti_soggetti.soggetto " +
+                        "WHERE id_utente = ?";
+
+                ResultSet rs = DB_Manager.query(sql, id_utente);
+                ArrayList<String[]> sogg = new ArrayList<>();
+                while (rs.next())
+                {
+                    Integer id_soggetto = Integer.valueOf(rs.getInt("id_soggetto"));
+                    String nome = rs.getString("soggetto.nome");
+                    sogg.add(new String[]{id_soggetto.toString(), nome});
+                }
+
+                if (sogg.isEmpty())
+                {
+                    sendMessage(chatId, "Non hai attori/registi preferiti. Prova a cercarne con il comando /cerca nome.");
+                    return;
+                }
+
+                StringBuilder sb = new StringBuilder();
+                sb.append("REGISTI/ATTORI PREFERITI ✨\n");
+                for (int i = 0; i < sogg.size(); i++)
+                    sb.append(i + 1).append(". ").append(sogg.get(i)[1]);
+                sendMessage(chatId, sb.toString());
+            }
+            else
+            {
+                sendMessage(chatId, "Nessun preferito!");
+                addUser(chatId);
+            }
+
+        } catch (SQLException e) {
+            sendMessage(chatId, "Errore nella lettura dei preferiti!");
         }
     }
 
@@ -533,6 +604,40 @@ public class CornBOT extends TelegramLongPollingBot
         catch (SQLException e)
         {
             System.out.println("Errore nella rimozione del film");
+        }
+    }
+
+    private void remPreferitoSoggetto(Long chatId, String nome)
+    {
+        try
+        {
+            String sql = "SELECT id_utente FROM utente WHERE telegram_id = ?";
+            Integer id_utente = DB_Manager.query_ID(sql, chatId.intValue());
+
+            if (id_utente != null)
+            {
+                sql = "SELECT id_soggetto, soggetto.nome FROM preferiti_soggetti " +
+                        "INNER JOIN utente ON utente.id_utente = preferiti_soggetti.utente " +
+                        "INNER JOIN soggetto ON soggetto.id_soggetto = preferiti_soggetti.soggetto " +
+                        "WHERE id_utente = ? AND soggetto.nome LIKE ?";
+                ResultSet rs = DB_Manager.query(sql, id_utente, "%" + nome + "%");
+
+                if (rs.next())
+                {
+                    sql = "DELETE FROM preferiti_soggetti WHERE utente = ? AND soggetto = ?";
+                    DB_Manager.update(sql, id_utente, rs.getInt("id_soggetto"));
+                    sendMessage(chatId, "Rimosso " + rs.getString("soggetto.nome") + " dai tuoi preferiti!");
+                }
+            }
+            else
+            {
+                sendMessage(chatId, "Persona non trovata tra i tuoi preferiti! Digita il comando /preferiti per vedere i tuoi preferiti");
+                addUser(chatId);
+            }
+        }
+        catch (SQLException e)
+        {
+            System.out.println("Errore nella rimozione della persona!");
         }
     }
 
