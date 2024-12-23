@@ -5,7 +5,15 @@ public class Main
 {
     public static void main(String[] args)
     {
-        CS_Scraper.Cinema_scraping(); //primo scraping dei cinema e dei film disponibili
+        Thread scrapingThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                CS_Scraper.Cinema_scraping();  // Esegui il primo scraping
+            }
+        });
+
+        //avvio del thread per il cinema scraping
+        scrapingThread.start();
 
         try //avvio del bot telegram
         {

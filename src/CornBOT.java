@@ -11,6 +11,10 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /** Classe per la gestione del bot
  *
@@ -24,6 +28,7 @@ public class CornBOT extends TelegramLongPollingBot
     private Map<Long, Integer> pendingAppuntiSoggetto = new HashMap<>(); //map per salvare l'id del soggetto
     private Map<Long, Integer> pendingCinema = new HashMap<>(); //map per salvare l'id cinema
     private Map<Long, Integer[]> pendingValutazioni = new HashMap<>(); //map per salvare le valutazioni
+    private ExecutorService executorService = Executors.newFixedThreadPool(10);  // 10 thread al massimo
 
     /** Getter per username bot
      *
@@ -49,197 +54,166 @@ public class CornBOT extends TelegramLongPollingBot
     @Override
     public void onUpdateReceived(Update update)
     {
-        if (update.hasMessage() && update.getMessage().hasText()) //se il messaggio ha un testo (scritto dall'utente)
-        {
-            String messageText = update.getMessage().getText(); //testo del messaggio
-            Long chatId = update.getMessage().getChatId(); //telegram_id dell'utente
+        executorService.submit(() -> {
+            if (update.hasMessage() && update.getMessage().hasText()) //se il messaggio ha un testo (scritto dall'utente)
+            {
+                String messageText = update.getMessage().getText(); //testo del messaggio
+                Long chatId = update.getMessage().getChatId(); //telegram_id dell'utente
 
-            if (pendingAppuntiFilm.containsKey(chatId)) //se l'utente ha scritto un appunto al film
-            {
-                Integer id_film = pendingAppuntiFilm.remove(chatId); //recupera l'id del film
-                addAppunti(chatId, id_film, messageText, true); //gli aggiunge al db
-            }
-            else if (pendingAppuntiSoggetto.containsKey(chatId)) //se l'utente ha scritto un appunto al soggetto
-            {
-                Integer id_soggetto = pendingAppuntiSoggetto.remove(chatId); //recupera l'id del soggetto
-                addAppunti(chatId, id_soggetto, messageText, false); //aggiunge l'appunto al db
-            }
-            else if (pendingValutazioni.containsKey(chatId)) //se l'utente vuole lasciare una recensione
-            {
-                Integer[] info = pendingValutazioni.remove(chatId); //prende id_film e valutazione
-                upRecensione(chatId, info[0], info[1], messageText); //aggiunge la recensione nel db
-            }
-            else if (pendingCinema.containsKey(chatId)) //se l'utente vuole sapere i film nel cinema
-            {
-                Integer id_film = pendingCinema.remove(chatId); //prende l'id del film interessato
-                cinema(chatId, id_film, messageText); //lo cerca nel db
-            }
-            else if (messageText.startsWith("/cercafilm")) //comando per cercare il film
-            {
-                String titolo = messageText.replace("/cercafilm", "").trim(); //prende il titolo
-                cercaFilm(chatId, titolo); //cerca il film nel db
-            }
-            else if (messageText.equals("/watchlist")) //comando per vedere la watchlist
-                watchlist(chatId);
-            else if (messageText.equals("/preferitifilm")) //comando per vedere i film preferiti
-                preferitoFilm(chatId);
-            else if (messageText.equals("/preferiti")) //comando per vedere i preferiti
-                preferitoSoggetto(chatId);
-            else if (messageText.startsWith("/nopreferitifilm")) //comando per rimuovere dai film preferiti
-            {
-                String titolo = messageText.replace("/nopreferitifilm", "").trim(); //prende il titolo
-                remPreferitoFilm(chatId, titolo);
-            }
-            else if (messageText.startsWith("/nopreferiti")) //comando per rimuovere dai preferiti
-            {
-                String nome = messageText.replace("/nopreferiti", "").trim(); //prende il nome del soggetto
-                remPreferitoSoggetto(chatId, nome);
-            }
-            else if (messageText.startsWith("/visto")) //comando per togliere dalla watchlist
-            {
-                String titolo = messageText.replace("/visto", "").trim(); //prende il titolo
-                remWatchlist(chatId, titolo);
-            }
-            else if (messageText.startsWith("/aggiungiwatchlist")) //comando per aggiungere alla watchlist
-            {
-                String titolo = messageText.replace("/aggiungiwatchlist", "").trim(); //prende il titolo
-                addWatchlist(chatId, titolo);
-            }
-            else if (messageText.equals("/start")) //comando per iniziare
-            {
-                sendMessage(chatId, "Benvenuto su CornBOT 🎞️! Usa /help per vedere i comandi.");
-                try
+                if (pendingAppuntiFilm.containsKey(chatId)) //se l'utente ha scritto un appunto al film
                 {
-                    String sql = "SELECT id_utente FROM utente WHERE telegram_id = ?"; //verifica se l'utente è già registrato
-                    Integer id_utente = DB_Manager.query_ID(sql, chatId.intValue()); //cerca l'id dell'utente
-                    if (id_utente == null)
-                       addUser(chatId);
-                }
-                catch (SQLException e)
+                    Integer id_film = pendingAppuntiFilm.remove(chatId); //recupera l'id del film
+                    addAppunti(chatId, id_film, messageText, true); //gli aggiunge al db
+                } else if (pendingAppuntiSoggetto.containsKey(chatId)) //se l'utente ha scritto un appunto al soggetto
                 {
-                    System.out.println("Errore nella creazione dell'utente");
-                }
-            }
-            else if (messageText.startsWith("/cerca")) //comando per cercare un soggetto
-            {
-                String persona = messageText.replace("/cerca", "").trim(); //prende il nome
-                cercaPersona(chatId, persona);
-            }
-            else if (messageText.equals("/help")) //il comando dei comandi
-            {
-                sendMessage(chatId, "COMANDI BOT 🤖\ncerca - Cerca persona dal nome\n" +
-                        "cercafilm - Cerca film dal titolo\n" +
-                        "watchlist - Guarda i film salvati nella watchlist\n" +
-                        "aggiungiwatchlist - Aggiungi film alla tua watchlist \n" +
-                        "visto - Elimina il film dalla watchlist\n" +
-                        "preferiti - Guarda i preferiti\n" +
-                        "preferitifilm - Guarda i film preferiti\n" +
-                        "nopreferiti - Elimina dai preferiti\n" +
-                        "nopreferitifilm- Elimina dai film preferiti\n" +
-                        "help - Vedi l’elenco dei comandi");
-            }
-            else //se l'utente digita qualcosa che non esiste
-                sendMessage(chatId, "Comando non riconosciuto 🤔. Usa /help per vedere i comandi disponbili.");
-        }
-        if (update.hasCallbackQuery()) //se l'utente preme un bottone
-        {
-            Long chatId = update.getCallbackQuery().getMessage().getChatId(); //prende l'id
-            if (update.getCallbackQuery().getData().contains("biografia_")) //se è il bottone biografia
-            {
-                try
+                    Integer id_soggetto = pendingAppuntiSoggetto.remove(chatId); //recupera l'id del soggetto
+                    addAppunti(chatId, id_soggetto, messageText, false); //aggiunge l'appunto al db
+                } else if (pendingValutazioni.containsKey(chatId)) //se l'utente vuole lasciare una recensione
                 {
-                    String nome = update.getCallbackQuery().getData().split("_")[1]; //prende il nome del soggetto
-                    String query = "SELECT biografia FROM Soggetto WHERE nome LIKE ?";
-                    ResultSet rs = DB_Manager.query(query, "%" + nome + "%");
-
-                    if (rs.next())
-                    {
-                        String reply = "BIOGRAFIA DI " + nome.toUpperCase(Locale.ROOT) + " 📖\n" +
-                            rs.getString("biografia");
-                        sendMessage(chatId, reply); //stampa la biografia del soggetto
+                    Integer[] info = pendingValutazioni.remove(chatId); //prende id_film e valutazione
+                    upRecensione(chatId, info[0], info[1], messageText); //aggiunge la recensione nel db
+                } else if (pendingCinema.containsKey(chatId)) //se l'utente vuole sapere i film nel cinema
+                {
+                    Integer id_film = pendingCinema.remove(chatId); //prende l'id del film interessato
+                    cinema(chatId, id_film, messageText); //lo cerca nel db
+                } else if (messageText.startsWith("/cercafilm")) //comando per cercare il film
+                {
+                    String titolo = messageText.replace("/cercafilm", "").trim(); //prende il titolo
+                    cercaFilm(chatId, titolo); //cerca il film nel db
+                } else if (messageText.equals("/watchlist")) //comando per vedere la watchlist
+                    watchlist(chatId);
+                else if (messageText.equals("/preferitifilm")) //comando per vedere i film preferiti
+                    preferitoFilm(chatId);
+                else if (messageText.equals("/preferiti")) //comando per vedere i preferiti
+                    preferitoSoggetto(chatId);
+                else if (messageText.startsWith("/nopreferitifilm")) //comando per rimuovere dai film preferiti
+                {
+                    String titolo = messageText.replace("/nopreferitifilm", "").trim(); //prende il titolo
+                    remPreferitoFilm(chatId, titolo);
+                } else if (messageText.startsWith("/nopreferiti")) //comando per rimuovere dai preferiti
+                {
+                    String nome = messageText.replace("/nopreferiti", "").trim(); //prende il nome del soggetto
+                    remPreferitoSoggetto(chatId, nome);
+                } else if (messageText.startsWith("/visto")) //comando per togliere dalla watchlist
+                {
+                    String titolo = messageText.replace("/visto", "").trim(); //prende il titolo
+                    remWatchlist(chatId, titolo);
+                } else if (messageText.startsWith("/aggiungiwatchlist")) //comando per aggiungere alla watchlist
+                {
+                    String titolo = messageText.replace("/aggiungiwatchlist", "").trim(); //prende il titolo
+                    addWatchlist(chatId, titolo);
+                } else if (messageText.equals("/start")) //comando per iniziare
+                {
+                    sendMessage(chatId, "Benvenuto su CornBOT 🎞️! Usa /help per vedere i comandi.");
+                    try {
+                        String sql = "SELECT id_utente FROM utente WHERE telegram_id = ?"; //verifica se l'utente è già registrato
+                        Integer id_utente = DB_Manager.query_ID(sql, chatId.intValue()); //cerca l'id dell'utente
+                        if (id_utente == null)
+                            addUser(chatId);
+                    } catch (SQLException e) {
+                        System.out.println("Errore nella creazione dell'utente");
                     }
-                }
-                catch (SQLException e)
+                } else if (messageText.startsWith("/cerca")) //comando per cercare un soggetto
                 {
-                    System.out.println("⚠️ Errore nella richiesta della biografia di " + update.getCallbackQuery().getData().split("_")[1]);
+                    String persona = messageText.replace("/cerca", "").trim(); //prende il nome
+                    cercaPersona(chatId, persona);
+                } else if (messageText.equals("/help")) //il comando dei comandi
+                {
+                    sendMessage(chatId, "COMANDI BOT 🤖\ncerca - Cerca persona dal nome\n" +
+                            "cercafilm - Cerca film dal titolo\n" +
+                            "watchlist - Guarda i film salvati nella watchlist\n" +
+                            "aggiungiwatchlist - Aggiungi film alla tua watchlist \n" +
+                            "visto - Elimina il film dalla watchlist\n" +
+                            "preferiti - Guarda i preferiti\n" +
+                            "preferitifilm - Guarda i film preferiti\n" +
+                            "nopreferiti - Elimina dai preferiti\n" +
+                            "nopreferitifilm- Elimina dai film preferiti\n" +
+                            "help - Vedi l’elenco dei comandi");
+                } else //se l'utente digita qualcosa che non esiste
+                    sendMessage(chatId, "Comando non riconosciuto 🤔. Usa /help per vedere i comandi disponbili.");
+            }
+            if (update.hasCallbackQuery()) //se l'utente preme un bottone
+            {
+                Long chatId = update.getCallbackQuery().getMessage().getChatId(); //prende l'id
+                if (update.getCallbackQuery().getData().contains("biografia_")) //se è il bottone biografia
+                {
+                    try {
+                        String nome = update.getCallbackQuery().getData().split("_")[1]; //prende il nome del soggetto
+                        String query = "SELECT biografia FROM Soggetto WHERE nome LIKE ?";
+                        ResultSet rs = DB_Manager.query(query, "%" + nome + "%");
+
+                        if (rs.next()) {
+                            String reply = "BIOGRAFIA DI " + nome.toUpperCase(Locale.ROOT) + " 📖\n" +
+                                    rs.getString("biografia");
+                            sendMessage(chatId, reply); //stampa la biografia del soggetto
+                        }
+                    } catch (SQLException e) {
+                        System.out.println("⚠️ Errore nella richiesta della biografia di " + update.getCallbackQuery().getData().split("_")[1]);
+                    }
+                } else if (update.getCallbackQuery().getData().contains("addwatchlist_")) //bottone per aggiungere alla watchlist //
+                {
+                    String titolo = update.getCallbackQuery().getData().split("_")[1]; //prende il titolo
+                    addWatchlist(chatId, titolo);
+                } else if (update.getCallbackQuery().getData().contains("recensione_")) //bottone per aggiungere la recensione
+                {
+                    Integer id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]); //prende l'id del film
+                    addRecensione(chatId, id);
+                } else if (update.getCallbackQuery().getData().contains("preferitofilm_")) //bottone per aggiungere ai preferiti un film
+                {
+                    Integer id_film = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
+                    addPreferito(chatId, id_film, true);
+                } else if (update.getCallbackQuery().getData().contains("preferitosoggetto_")) //bottone per aggiungere un soggetto ai preferiti
+                {
+                    Integer id_soggetto = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
+                    addPreferito(chatId, id_soggetto, false);
+                } else if (update.getCallbackQuery().getData().contains("appuntofilm_")) //bottone per aggiungere un appunto al film
+                {
+                    Integer id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
+                    pendingAppuntiFilm.put(chatId, id);
+                    sendMessage(chatId, "Scrivi ora il tuo appunto per il film");
+                } else if (update.getCallbackQuery().getData().contains("appuntosoggetto_")) //bottone per aggiungere un appunto al soggetto
+                {
+                    Integer id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
+                    pendingAppuntiSoggetto.put(chatId, id);
+                    sendMessage(chatId, "Scrivi ora il tuo commento per il soggetto");
+                } else if (update.getCallbackQuery().getData().contains("vediappuntisoggetto_")) //bottone per vedere gli appunti sul soggetto
+                {
+                    Integer id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
+                    appunti(chatId, id, false);
+                } else if (update.getCallbackQuery().getData().contains("vediappuntifilm_")) //bottone per vedere gli appunti sui film
+                {
+                    Integer id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
+                    appunti(chatId, id, true);
+                } else if (update.getCallbackQuery().getData().contains("eliminaapp_")) //bottone per eliminare l'appunto
+                {
+                    Integer id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
+                    remAppunti(chatId, id);
+                } else if (update.getCallbackQuery().getData().contains("rec_")) //bottone per lasciare uan recensione
+                {
+                    int rating = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
+                    int id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[2]);
+                    pendingValutazioni.put(chatId, new Integer[]{rating, id});
+                    sendMessage(chatId, "Scrivi il contenuto della recensione");
+                } else if (update.getCallbackQuery().getData().contains("vedirecensioni_")) //bottone per vedere le recensioni
+                {
+                    int id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
+                    printRecensioni(chatId, id);
+                } else if (update.getCallbackQuery().getData().contains("norecensioni_")) //bottone per eliminare la recensione
+                {
+                    int id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
+                    remRecensione(chatId, id);
+                } else if (update.getCallbackQuery().getData().contains("cinema_")) //bottone per vedere i cinema con quel film
+                {
+                    int id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
+                    pendingCinema.put(chatId, id);
+                    sendMessage(chatId, "Scrivi la città per cui fare la ricerca del cinema");
+                } else if (update.getCallbackQuery().getData().contains("cast_")) //bottone per vedere il cast del film
+                {
+                    int id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
+                    casting(chatId, id);
                 }
             }
-            else if (update.getCallbackQuery().getData().contains("addwatchlist_")) //bottone per aggiungere alla watchlist //
-            {
-                String titolo = update.getCallbackQuery().getData().split("_")[1]; //prende il titolo
-                addWatchlist(chatId, titolo);
-            }
-            else if (update.getCallbackQuery().getData().contains("recensione_")) //bottone per aggiungere la recensione
-            {
-                Integer id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]); //prende l'id del film
-                addRecensione(chatId, id);
-            }
-            else if (update.getCallbackQuery().getData().contains("preferitofilm_")) //bottone per aggiungere ai preferiti un film
-            {
-                Integer id_film = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
-                addPreferito(chatId, id_film, true);
-            }
-            else if (update.getCallbackQuery().getData().contains("preferitosoggetto_")) //bottone per aggiungere un soggetto ai preferiti
-            {
-                Integer id_soggetto = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
-                addPreferito(chatId, id_soggetto, false);
-            }
-            else if (update.getCallbackQuery().getData().contains("appuntofilm_")) //bottone per aggiungere un appunto al film
-            {
-                Integer id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
-                pendingAppuntiFilm.put(chatId, id);
-                sendMessage(chatId, "Scrivi ora il tuo appunto per il film");
-            }
-            else if (update.getCallbackQuery().getData().contains("appuntosoggetto_")) //bottone per aggiungere un appunto al soggetto
-            {
-                Integer id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
-                pendingAppuntiSoggetto.put(chatId, id);
-                sendMessage(chatId, "Scrivi ora il tuo commento per il soggetto");
-            }
-            else if (update.getCallbackQuery().getData().contains("vediappuntisoggetto_")) //bottone per vedere gli appunti sul soggetto
-            {
-                Integer id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
-                appunti(chatId, id, false);
-            }
-            else if (update.getCallbackQuery().getData().contains("vediappuntifilm_")) //bottone per vedere gli appunti sui film
-            {
-                Integer id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
-                appunti(chatId, id, true);
-            }
-            else if (update.getCallbackQuery().getData().contains("eliminaapp_")) //bottone per eliminare l'appunto
-            {
-                Integer id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
-                remAppunti(chatId, id);
-            }
-            else if (update.getCallbackQuery().getData().contains("rec_")) //bottone per lasciare uan recensione
-            {
-                int rating = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
-                int id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[2]);
-                pendingValutazioni.put(chatId, new Integer[]{rating, id});
-                sendMessage(chatId, "Scrivi il contenuto della recensione");
-            }
-            else if (update.getCallbackQuery().getData().contains("vedirecensioni_")) //bottone per vedere le recensioni
-            {
-                int id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
-                printRecensioni(chatId, id);
-            }
-            else if (update.getCallbackQuery().getData().contains("norecensioni_")) //bottone per eliminare la recensione
-            {
-                int id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
-                remRecensione(chatId, id);
-            }
-            else if (update.getCallbackQuery().getData().contains("cinema_")) //bottone per vedere i cinema con quel film
-            {
-                int id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
-                pendingCinema.put(chatId, id);
-                sendMessage(chatId, "Scrivi la città per cui fare la ricerca del cinema");
-            }
-            else if (update.getCallbackQuery().getData().contains("cast_")) //bottone per vedere il cast del film
-            {
-                int id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
-                casting(chatId, id);
-            }
-        }
+        });
     }
 
     /**
