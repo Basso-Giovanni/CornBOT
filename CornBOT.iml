@@ -11,5 +11,6 @@
     <orderEntry type="library" name="telegram.telegrambots.abilities" level="project" />
     <orderEntry type="library" name="jsoup" level="project" />
     <orderEntry type="library" name="json" level="project" />
+    <orderEntry type="library" name="quartz.scheduler" level="project" />
   </component>
 </module>

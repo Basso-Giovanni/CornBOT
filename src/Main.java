@@ -5,8 +5,9 @@ public class Main
 {
     public static void main(String[] args)
     {
-        //TMDB_Scraper.Film_scraper("https://www.themoviedb.org/movie/974576-conclave", 974576);
-        try
+        CS_Scraper.Cinema_scraping(); //primo scraping dei cinema e dei film disponibili
+
+        try //avvio del bot telegram
         {
             TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
             botsApi.registerBot(new CornBOT());
@@ -14,11 +15,7 @@ public class Main
         }
         catch (Exception e)
         {
-            e.printStackTrace();
+            System.out.println("Errore nell'avvio del BOT!");
         }
-
-        //Wiki_Scraper.Riconoscimenti_Scraper("lo squalo (film)");
-
-        //CS_Scraper.Cinema_scraping();
     }
 }

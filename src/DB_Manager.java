@@ -76,6 +76,14 @@ public class DB_Manager
         {
             ps.setObject(i + 1, params[i]);
         }
-        ps.executeUpdate();
+        try
+        {
+            ps.executeUpdate();
+        }
+        finally
+        {
+            ps.close();
+            conn.close();
+        }
     }
 }

@@ -3,13 +3,69 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+//CLASSE PER LO SCRAPING DAL SITO TMDB
 public class TMDB_Scraper
 {
+    /**
+     * Metodo per cercare l'URL del film/soggetto partendo dal titolo/nome
+     * @param titolo titolo del film/nome del soggetto
+     * @param film se si tratta di un film o di un soggetto
+     */
+    public static void Ricerca(String titolo, boolean film)
+    {
+        try
+        {
+            try
+            {
+                Thread.sleep(2000); //provo a mettere un'attesa per risolvere il problema del timeout
+            }
+            catch (InterruptedException e)
+            {
+                System.out.println("Errore nellttesa del thread per la ricerca");
+            }
+            String URL = "https://themoviedb.org/search?query=";
+
+            if (titolo != null && !titolo.isEmpty())
+            {
+                titolo.replace(" ", "+");
+                Document doc = Jsoup.connect(URL + titolo).get();
+                Element firstLink;
+                if (film) //se si tratta di un film
+                    firstLink = doc.selectFirst(".results .card .image a");
+                else //o di un soggetto
+                    firstLink = doc.selectFirst(".results .item.profile .image_content a.result");
+
+                if (firstLink != null) //prend il primo link
+                {
+                    String href = firstLink.attr("href");
+                    String risultato = "https://www.themoviedb.org" + href;
+                    int id = Integer.valueOf(risultato.split("/")[4].split("-")[0]);
+                    if (!risultato.contains("person"))
+                        TMDB_Scraper.Film_scraper(risultato, id);
+                    else
+                        System.out.println("Elemento non trovato!");
+                }
+                else
+                    System.out.println("Elemento non trovato!");
+            }
+        }
+        catch (IOException e)
+        {
+            System.out.println("Errore nella ricerca dell'elemento");
+        }
+    }
+
+    /**
+     * Metodo per ottenere i dati del film
+     * @param URL URL da cui effettuare lo scraping
+     * @param id id TMDB del film
+     */
     public static void Film_scraper(String URL, int id)
     {
         try
@@ -58,13 +114,11 @@ public class TMDB_Scraper
             String regista = "";
             Elements people = doc.select("ol.people.no_image li.profile");
 
-            // Cerca il regista tra i profili
-            for (Element person : people)
+            for (Element person : people) //ricerca del regista
             {
                 String role = person.select("p.character").text();
                 if (role.contains("Director"))
                 {
-                    // Ottieni il nome del regista
                     regista = person.select("p > a").text();
                     break;
                 }
@@ -74,17 +128,15 @@ public class TMDB_Scraper
 
             if (registaId == null) registaId = Soggetto_scraper(id, true, 0, regista);
 
-            String sql = "INSERT INTO Film (titolo, anno_produzione, genere, trama, durata, data_uscita, piattaforme, trailer_url, regista) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            String sql = "INSERT IGNORE INTO Film (titolo, anno_produzione, genere, trama, durata, data_uscita, piattaforme, trailer_url, regista) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
             DB_Manager.update(sql, titolo, anno, genere, trama, totalMinutes, formattedDate, sb.toString(), url_trailer, registaId);
-
-
 
             String query_id_film = "SELECT id_film FROM Film WHERE titolo = ?";
             Integer id_film = DB_Manager.query_ID(query_id_film, titolo);
 
             HashMap<Integer, String> ids = TMDB_API.GET_attoreIDDaFilm(id);
 
-            for (Integer id_attore : ids.keySet())
+            for (Integer id_attore : ids.keySet()) //ricerca del cast
             {
                 ArrayList<String> info_attore = TMDB_API.GET_soggetto(id_attore);
                 if (info_attore != null)
@@ -103,9 +155,16 @@ public class TMDB_Scraper
         {
             System.out.println("⚠️ Errore nell'estrazione dei dati. URL: " + URL);
         }
-
     }
 
+    /**
+     * Metodo per effettuare lo scraping del soggetto
+     * @param id_film id del film di partenza
+     * @param regia se si tratta del regista o di qualcun altro
+     * @param id_attore id TMDB del soggetto
+     * @param nome nome del soggetto
+     * @return id del soggetto
+     */
     public static Integer Soggetto_scraper(int id_film, boolean regia, int id_attore, String nome)
     {
         try

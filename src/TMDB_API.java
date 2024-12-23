@@ -7,10 +7,16 @@ import java.util.HashMap;
 
 import org.json.*;
 
+//CLASSE PER OTTENERE I DATI DALL'API DI TMDB
 public class TMDB_API
 {
     static final String API_KEY = Config.getTMDBToken();
 
+    /**
+     * Metodo per ottenere le piattaforme da cui vedere il film
+     * @param id id TMDB del film
+     * @return lista delle piattaforme
+     */
     public static ArrayList<String> GET_piattaforme(int id)
     {
         ArrayList<String> providers = new ArrayList<>();
@@ -34,6 +40,11 @@ public class TMDB_API
         return providers;
     }
 
+    /**
+     * Metodo per ottenere l'URL del trailer del film
+     * @param id id TMDB del film
+     * @return URL del trailer
+     */
     public static String GET_trailer(int id)
     {
         JSONArray film = GET("https://api.themoviedb.org/3/movie/" + id + "/videos?api_key=" + API_KEY).getJSONArray("results");
@@ -71,6 +82,11 @@ public class TMDB_API
         return URL_trailer;
     }
 
+    /**
+     * Metodo generico per effettuare la richiesta all'API TMDB
+     * @param apiUrl URL per la richiesta
+     * @return oggetto JSON contenente la risposta del GET
+     */
     private static JSONObject GET(String apiUrl)
     {
         try
@@ -99,6 +115,12 @@ public class TMDB_API
         return null;
     }
 
+    /**
+     * Metodo per ottenere l'id TMDB del regista del film
+     * @param id id TMDB del film
+     * @param nome nome del regista
+     * @return id TMDB del regista
+     */
     public static Integer GET_registaIDDaFilm(int id, String nome)
     {
         String apiUrl = "https://api.themoviedb.org/3/movie/" + id + "/credits?api_key=" + API_KEY;
@@ -113,6 +135,11 @@ public class TMDB_API
         return null;
     }
 
+    /**
+     * Metodo per ottenere la map degli attori nel film e il loro ruolo
+     * @param id id TMDB del film
+     * @return map degli attori nel film e il loro ruolo
+     */
     public static HashMap<Integer, String> GET_attoreIDDaFilm(int id)
     {
         HashMap<Integer, String> ids = new HashMap<>();
@@ -124,11 +151,16 @@ public class TMDB_API
         return ids;
     }
 
+    /**
+     * Metodo per ottenere le info di un soggetto
+     * @param id id TMDB del soggetto
+     * @return lista delle informazioni del soggetto
+     */
     public static ArrayList<String> GET_soggetto(int id)
     {
         JSONObject dati = GET("https://api.themoviedb.org/3/person/" + id + "?api_key=" + API_KEY);
         ArrayList<String> info = new ArrayList<>();
-        if (!dati.isNull("name"))
+        if (dati != null && !dati.isNull("name"))
         {
             info.add(dati.getString("name"));
             info.add(dati.isNull("birthday") ? null : dati.getString("birthday"));
@@ -141,5 +173,4 @@ public class TMDB_API
 
         return info;
     }
-
 }
