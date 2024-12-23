@@ -29,6 +29,18 @@ public class CornBOT extends TelegramLongPollingBot
     private Map<Long, Integer> pendingCinema = new HashMap<>(); //map per salvare l'id cinema
     private Map<Long, Integer[]> pendingValutazioni = new HashMap<>(); //map per salvare le valutazioni
     private ExecutorService executorService = Executors.newFixedThreadPool(10);  // 10 thread al massimo
+    private ScheduledExecutorService scheduler;
+
+
+    public CornBOT()
+    {
+        // Crea un scheduled thread pool con un singolo thread
+        scheduler = Executors.newSingleThreadScheduledExecutor();
+
+        // Pianifica l'esecuzione del metodo filmNotifier ogni 30 secondi (modifica questo intervallo a tuo piacere)
+        scheduler.scheduleAtFixedRate(this::filmNotifier, 0, 30, TimeUnit.SECONDS);
+    }
+
 
     /** Getter per username bot
      *
@@ -212,6 +224,11 @@ public class CornBOT extends TelegramLongPollingBot
                     int id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
                     casting(chatId, id);
                 }
+                else if (update.getCallbackQuery().getData().contains("promemoria_")) //bottone per aggiungere il promemoria
+                {
+                    int id = Integer.valueOf(update.getCallbackQuery().getData().split("_")[1]);
+                    addPromemoria(chatId, id);
+                }
             }
         });
     }
@@ -266,6 +283,7 @@ public class CornBOT extends TelegramLongPollingBot
                 List<InlineKeyboardButton> lista_btn_6 = new ArrayList<>();
                 List<InlineKeyboardButton> lista_btn_7 = new ArrayList<>();
                 List<InlineKeyboardButton> lista_btn_8 = new ArrayList<>();
+                List<InlineKeyboardButton> lista_btn_9 = new ArrayList<>();
                 InlineKeyboardButton btn_watch = new InlineKeyboardButton(); //bottone della watchlist
                 InlineKeyboardButton btn_rec = new InlineKeyboardButton(); //bottone recensione
                 InlineKeyboardButton btn_pre = new InlineKeyboardButton(); //bottone preferiti
@@ -275,6 +293,7 @@ public class CornBOT extends TelegramLongPollingBot
                 InlineKeyboardButton btn_nre = new InlineKeyboardButton(); //bottone per eliminare la recensione
                 InlineKeyboardButton btn_cin = new InlineKeyboardButton(); //bottone per vedere se il film è al cinema
                 InlineKeyboardButton btn_cas = new InlineKeyboardButton(); //bottone per vedere il cast
+                InlineKeyboardButton btn_pro = new InlineKeyboardButton(); //bottone per aggiungere un promemoria
                 btn_watch.setText("Aggiungi alla watchlist 📺");
                 btn_rec.setText("Lascia una recensione ⭐");
                 btn_nre.setText("Elimina recensione ❌️");
@@ -284,6 +303,7 @@ public class CornBOT extends TelegramLongPollingBot
                 btn_vre.setText("Vedi recensioni  🧾️");
                 btn_cin.setText("️Trova il film nei cinema 📽️");
                 btn_cas.setText("Cast del film 🎞️️");
+                btn_pro.setText("Aggiungi promemoria ⌚️️");
                 btn_watch.setCallbackData("addwatchlist_" + rs.getString("titolo"));
                 btn_rec.setCallbackData("recensione_" + rs.getInt("id_film"));
                 btn_pre.setCallbackData("preferitofilm_" + rs.getInt("id_film"));
@@ -293,6 +313,7 @@ public class CornBOT extends TelegramLongPollingBot
                 btn_nre.setCallbackData("norecensioni_" + rs.getInt("id_film"));
                 btn_cin.setCallbackData("cinema_" + rs.getInt("id_film"));
                 btn_cas.setCallbackData("cast_" + rs.getInt("id_film"));
+                btn_pro.setCallbackData("promemoria_" + rs.getInt("id_film"));
                 lista_btn_1.add(btn_watch);
                 sql = "SELECT * FROM recensione INNER JOIN utente on utente.id_utente = recensione.utente WHERE film = ? AND telegram_id = ?";
                 rs_rec = DB_Manager.query(sql, rs.getInt("id_film"), chatId);
@@ -309,6 +330,7 @@ public class CornBOT extends TelegramLongPollingBot
                     lista_btn_6.add(btn_vre);
                 lista_btn_7.add(btn_cin);
                 lista_btn_8.add(btn_cas);
+                lista_btn_9.add(btn_pro);
                 List<List<InlineKeyboardButton>> riga = new ArrayList<>();
                 riga.add(lista_btn_8);
                 riga.add(lista_btn_1);
@@ -319,6 +341,19 @@ public class CornBOT extends TelegramLongPollingBot
                 riga.add(lista_btn_5);
                 riga.add(lista_btn_6);
                 riga.add(lista_btn_7);
+
+                Date dataUscita = rs.getDate("data_uscita");
+
+                if (dataUscita != null)
+                {
+                    LocalDate today = LocalDate.now();
+                    LocalDate dataUscitaLocal = dataUscita.toLocalDate();
+                    if (dataUscitaLocal.isAfter(today))
+                    {
+                        riga.add(lista_btn_9);
+                    }
+                }
+
                 ikm.setKeyboard(riga);
                 sendMessage(chatId, reply, ikm);
                 rs.close();
@@ -1177,6 +1212,89 @@ public class CornBOT extends TelegramLongPollingBot
         catch (SQLException e)
         {
             System.out.println("Errore nella creazione dell'utente: " + chatId);
+        }
+    }
+
+    /**
+     * Metodo per inviare le notifiche appena esce un film
+     */
+    private void filmNotifier()
+    {
+        try
+        {
+            String sql = "SELECT * FROM promemoria INNER JOIN film ON film.id_film = promemoria.film INNER JOIN utente ON utente.id_utente = promemoria.utente WHERE film.data_uscita = CURDATE()";
+            ResultSet rs = DB_Manager.query(sql);
+
+            while (rs.next())
+            {
+                int id_film = rs.getInt("film");
+                Long chatId = rs.getLong("telegram_id");
+                sql = "SELECT id_utente FROM utente WHERE telegram_id = ?";
+                int id_utente = DB_Manager.query_ID(sql, chatId);
+                sendNotification(chatId, id_film);
+
+                sql = "DELETE FROM promemoria WHERE film = ? AND utente = ?";
+                DB_Manager.update(sql, id_film, id_utente);
+            }
+        }
+        catch (SQLException e)
+        {
+            System.out.println("Errore nell'invio della notifica!");
+        }
+    }
+
+    private void sendNotification(Long chatId, int id_film)
+    {
+        try
+        {
+            String sql = "SELECT * FROM film WHERE id_film = ?";
+            ResultSet rs = DB_Manager.query(sql, id_film);
+
+            while (rs.next())
+            {
+                String reply = "Il film " + rs.getString("titolo").toUpperCase() + " esce oggi 🎉";
+                sendMessage(chatId, reply);
+            }
+
+        }
+        catch (SQLException e)
+        {
+            System.out.println("Errore nell'invio della notifica");
+        }
+    }
+
+    /**
+     * Metodo per creare un promemoria
+     * @param chatId id della chat
+     * @param id_film id del film
+     */
+    private void addPromemoria(Long chatId, Integer id_film)
+    {
+        try
+        {
+            String sql = "SELECT id_utente FROM utente WHERE telegram_id = ?";
+            Integer id_utente = DB_Manager.query_ID(sql, chatId);
+
+            if (id_utente != null)
+            {
+                sql = "SELECT * FROM promemoria WHERE utente = ? AND film = ?";
+                ResultSet rs = DB_Manager.query(sql, id_utente, id_film);
+
+                if (!rs.isBeforeFirst())
+                {
+                    sql = "INSERT INTO promemoria (utente, film) VALUES (?, ?)";
+                    DB_Manager.update(sql, id_utente, id_film);
+                    sendMessage(chatId, "Film inserito nei promemoria!");
+                }
+                else
+                    sendMessage(chatId, "Film già inserito nei promemoria!");
+                rs.close();
+            }
+        }
+        catch (SQLException e)
+        {
+            System.out.println("Errore nella creazione del promemoria");
+            sendMessage(chatId, "Errore nella creazione del promemoria");
         }
     }
 }
